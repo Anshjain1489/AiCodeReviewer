@@ -34,6 +34,15 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Rate Limiting
 app.use('/api/', apiLimiter);
 
+// Root Status Endpoint
+app.all('/', (req, res) => {
+  return res.status(200).json({
+    success: true,
+    message: 'AI Code Reviewer & Bug Detection Platform API is online.',
+    docs: '/api/v1/health',
+  });
+});
+
 // Base API Routes
 app.use('/api/v1', routes);
 
