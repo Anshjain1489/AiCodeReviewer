@@ -17,7 +17,12 @@ const allowedOrigins = [env.FRONTEND_URL, 'http://localhost:3000', 'http://local
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || env.NODE_ENV === 'development') {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        env.NODE_ENV === 'development'
+      ) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS allowlist'));
