@@ -26,6 +26,9 @@ jobs:
           npm ci
 
       - name: Validate Prisma Schema
+        env:
+          DATABASE_URL: "postgresql://postgres:postgrespassword@localhost:5432/aicode_reviewer?schema=public"
+          DIRECT_URL: "postgresql://postgres:postgrespassword@localhost:5432/aicode_reviewer?schema=public"
         run: |
           cd backend
           npx prisma validate
@@ -34,6 +37,7 @@ jobs:
         env:
           NODE_ENV: test
           DATABASE_URL: "postgresql://postgres:postgrespassword@localhost:5432/aicode_reviewer?schema=public"
+          DIRECT_URL: "postgresql://postgres:postgrespassword@localhost:5432/aicode_reviewer?schema=public"
           JWT_SECRET: "ci_test_super_secret_jwt_key_32_characters"
           AI_PROVIDER: "mock"
         run: |
