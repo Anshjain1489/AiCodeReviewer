@@ -1,23 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { FolderGit2, Plus, ArrowLeft, History, Code2 } from 'lucide-react';
+import { Plus, ArrowLeft } from 'lucide-react';
 import api from '../services/api';
+import Skeleton from '../components/Skeleton';
+import ErrorState from '../components/ErrorState';
 
 const ProjectDetails = () => {
   const { projectId } = useParams();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchProjectDetails = async () => {
       try {
         setLoading(true);
+        setError(null);
         const res = await api.get(`/projects/${projectId}`);
         if (res.success && res.data.project) {
           setProject(res.data.project);
         }
       } catch (err) {
         console.error('Failed to load project details:', err);
+        setError('Project workspace not found.');
       } finally {
         setLoading(false);
       }
@@ -27,23 +32,19 @@ const ProjectDetails = () => {
 
   if (loading) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center gap-3">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs font-mono text-slate-400">Loading project details...</span>
+      <div className="space-y-6">
+        <Skeleton variant="title" />
+        <Skeleton variant="card" className="h-64" />
       </div>
     );
   }
 
-  if (!project) {
-    return (
-      <div className="text-center py-12 text-slate-400 text-xs">
-        Project not found. <Link to="/projects" className="text-indigo-400 underline">Return to Projects</Link>
-      </div>
-    );
+  if (error || !project) {
+    return <ErrorState message={error || 'Project not found.'} />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fadeIn">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -51,7 +52,7 @@ const ProjectDetails = () => {
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <h1 className="text-2xl font-extrabold text-white tracking-tight">{project.name}</h1>
-            <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold">
               {project.language}
             </span>
           </div>
@@ -60,14 +61,14 @@ const ProjectDetails = () => {
 
         <Link
           to={`/reviews/new`}
-          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30"
+          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>New Review for Project</span>
         </Link>
       </div>
 
-      <div className="bg-dark-surface border border-dark-border p-6 rounded-xl space-y-4">
+      <div className="bg-dark-surface border border-dark-border p-6 rounded-xl space-y-4 shadow-xl">
         <div className="flex items-center justify-between pb-3 border-b border-dark-border">
           <h3 className="text-sm font-bold text-white tracking-tight">Project Review History</h3>
           <span className="text-xs font-mono text-slate-400">{project.reviews?.length || 0} Total Reviews</span>
@@ -75,7 +76,7 @@ const ProjectDetails = () => {
 
         {project.reviews?.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-500 font-mono">
-            No code reviews generated for this project yet.
+            No code reviews generated for this project workspace yet.
           </div>
         ) : (
           <div className="divide-y divide-dark-border text-xs font-mono">

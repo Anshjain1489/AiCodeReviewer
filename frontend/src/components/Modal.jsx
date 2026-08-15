@@ -19,14 +19,22 @@ const Modal = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-dark-surface border border-dark-border rounded-xl shadow-2xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border bg-dark-bg/40">
-          <h3 className="text-lg font-bold text-white tracking-tight">{title}</h3>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <div className="relative w-full max-w-lg bg-dark-surface border border-dark-border rounded-xl shadow-2xl overflow-hidden z-10 animate-slideUp">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-dark-border bg-dark-bg/60">
+          <h3 id="modal-title" className="text-base font-bold text-white tracking-tight">
+            {title}
+          </h3>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-dark-border transition-colors"
+            aria-label="Close dialog"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-dark-hover transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <X className="w-5 h-5" />
           </button>

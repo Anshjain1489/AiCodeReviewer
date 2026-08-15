@@ -1,0 +1,13 @@
+# robots.txt for AI Code Reviewer & Bug Detection Platform
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+Disallow: /dashboard
+Disallow: /projects
+Disallow: /reviews
+Disallow: /github
+Disallow: /analytics
+Disallow: /settings
+
+Sitemap: https://ai-code-reviewer-ips-academyl.vercel.app/sitemap.xml

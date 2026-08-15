@@ -3,8 +3,9 @@ import React from 'react';
 import App from '../App';
 
 describe('Frontend App Rendering Test', () => {
-  it('renders landing page headline', () => {
+  it('renders landing page headline', async () => {
     render(<App />);
-    expect(screen.getByText(/Detect Bugs & Security Flaws/i)).toBeInTheDocument();
+    const headline = await screen.findByText(/Ship Better Code With/i);
+    expect(headline).toBeInTheDocument();
   });
 });

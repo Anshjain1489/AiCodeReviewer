@@ -14,6 +14,18 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'monaco-editor': ['@monaco-editor/react'],
+          'recharts-vendor': ['recharts'],
+          'lucide-icons': ['lucide-react'],
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',

@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ScoreCard from '../components/ScoreCard';
-import SeverityBadge from '../components/SeverityBadge';
+import Skeleton from '../components/Skeleton';
+import ErrorState from '../components/ErrorState';
 import api from '../services/api';
-import { GitPullRequest, ArrowLeft, CheckCircle2, Send, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Send, ShieldCheck } from 'lucide-react';
 
 const PRReview = () => {
   const { pullRequestId } = useParams();
   const [review, setReview] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // AI Comment Approval State
   const [commentText, setCommentText] = useState('');
@@ -19,13 +21,14 @@ const PRReview = () => {
     const runPRReview = async () => {
       try {
         setLoading(true);
+        setError(null);
         const res = await api.post(`/github/pulls/${pullRequestId}/review`);
         if (res.success && res.data.reviewId) {
           const detailRes = await api.get(`/reviews/${res.data.reviewId}`);
           if (detailRes.success) {
             setReview(detailRes.data.review);
             const initialComment = `## 🤖 AI Code Review Summary
-            
+
 **Overall Score**: ${detailRes.data.review.overallScore || 90}/100
 **Total Issues Detected**: ${detailRes.data.review.totalIssues || 0}
 
@@ -39,6 +42,7 @@ const PRReview = () => {
         }
       } catch (err) {
         console.error('Failed to run PR review:', err);
+        setError('Failed to run PR review.');
       } finally {
         setLoading(false);
       }
@@ -58,7 +62,7 @@ const PRReview = () => {
         setPublished(true);
       }
     } catch (err) {
-      alert('Failed to publish comment to GitHub');
+      alert('Failed to publish comment to GitHub API');
     } finally {
       setPublishing(false);
     }
@@ -66,15 +70,20 @@ const PRReview = () => {
 
   if (loading) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center gap-3">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs font-mono text-slate-400">Analyzing PR changed files & generating AI review...</span>
+      <div className="space-y-6">
+        <Skeleton variant="title" />
+        <Skeleton variant="card" className="h-48" />
+        <Skeleton variant="card" className="h-64" />
       </div>
     );
   }
 
+  if (error) {
+    return <ErrorState title="PR Review Failed" message={error} />;
+  }
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fadeIn">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -102,12 +111,12 @@ const PRReview = () => {
           </span>
         </div>
 
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-400 leading-relaxed">
           Per platform security policy, AI review comments are never posted automatically. Review and edit the markdown draft below, then explicitly click "Approve & Publish to GitHub".
         </p>
 
         {published ? (
-          <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 rounded-lg text-xs font-medium flex items-center gap-2">
+          <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 rounded-xl text-xs font-medium flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 shrink-0" />
             <span>AI Review comment successfully approved and published to GitHub API!</span>
           </div>
@@ -117,13 +126,13 @@ const PRReview = () => {
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               rows={8}
-              className="w-full bg-dark-bg border border-dark-border rounded-lg p-3.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500"
+              className="w-full bg-dark-bg border border-dark-border rounded-xl p-3.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500"
             />
 
             <button
               onClick={handleApproveAndPublish}
               disabled={publishing}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-lg text-xs transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2"
             >
               <Send className="w-4 h-4" />
               <span>{publishing ? 'Publishing to GitHub API...' : 'Approve & Publish to GitHub'}</span>

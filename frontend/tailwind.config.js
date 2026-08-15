@@ -9,12 +9,12 @@ export default {
     extend: {
       colors: {
         dark: {
-          bg: '#0B0F19',
-          surface: '#111827',
-          card: '#1F2937',
-          border: '#374151',
-          muted: '#9CA3AF',
-          hover: '#374151',
+          bg: '#080B11',
+          surface: '#0E131F',
+          card: '#141A29',
+          border: '#1E2638',
+          hover: '#2E3A52',
+          muted: '#8B949E',
         },
         brand: {
           50: '#EEF2FF',
@@ -32,10 +32,34 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'Monaco', 'monospace'],
+      },
+      keyframes: {
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' }
+        },
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(4px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' }
+        },
+        slideUp: {
+          '0%': { opacity: '0', transform: 'translateY(12px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' }
+        },
+        pulseSubtle: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.6' }
+        }
+      },
+      animation: {
+        shimmer: 'shimmer 1.8s infinite',
+        fadeIn: 'fadeIn 0.2s ease-out forwards',
+        slideUp: 'slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        pulseSubtle: 'pulseSubtle 2s infinite ease-in-out',
       }
     },
   },
   plugins: [],
 }
+

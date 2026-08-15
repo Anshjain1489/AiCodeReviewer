@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { Play, Upload, Code2, FolderGit2, AlertTriangle, Sparkles } from 'lucide-react';
+import { Upload, Code2, FolderGit2, AlertTriangle, Sparkles, FileText } from 'lucide-react';
 import api from '../services/api';
+import AnalysisProgress from '../components/AnalysisProgress';
 
 const DEFAULT_SAMPLE_CODE = `// Sample JavaScript Code with Security & Quality Vulnerabilities
 const express = require('express');
@@ -31,6 +32,7 @@ const NewReview = () => {
   const [projectId, setProjectId] = useState('');
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [currentStage, setCurrentStage] = useState('PREPARING');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -70,6 +72,7 @@ const NewReview = () => {
 
     setError('');
     setLoading(true);
+    setCurrentStage('PREPARING');
 
     try {
       const res = await api.post('/reviews', {
@@ -80,23 +83,29 @@ const NewReview = () => {
       });
 
       if (res.success && res.data.reviewId) {
-        // Poll for review completion if status is QUEUED/RUNNING
         const reviewId = res.data.reviewId;
+
+        // Simulated progress stages correlating to backend evaluation
+        setCurrentStage('STATIC');
+        setTimeout(() => setCurrentStage('AI_REASONING'), 800);
+        setTimeout(() => setCurrentStage('SCORING'), 1600);
+
         const pollInterval = setInterval(async () => {
           try {
             const check = await api.get(`/reviews/${reviewId}`);
             if (check.success && check.data.review) {
               const status = check.data.review.status;
               if (status === 'COMPLETED' || status === 'FAILED') {
+                setCurrentStage('RECOMMENDATIONS');
                 clearInterval(pollInterval);
-                navigate(`/reviews/${reviewId}`);
+                setTimeout(() => navigate(`/reviews/${reviewId}`), 400);
               }
             }
           } catch (pollErr) {
             clearInterval(pollInterval);
             navigate(`/reviews/${reviewId}`);
           }
-        }, 1500);
+        }, 1200);
       }
     } catch (err) {
       setError(err.message || 'Failed to initiate code review.');
@@ -105,10 +114,18 @@ const NewReview = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fadeIn">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">New Code Review Workspace</h1>
+          <p className="text-xs text-slate-400 mt-1">Paste code or upload files for instant ESLint, Semgrep, and Gemini AI analysis</p>
+        </div>
+      </div>
+
       {/* Workspace Header Toolbar */}
-      <div className="bg-dark-surface border border-dark-border p-4 rounded-xl flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="bg-dark-surface border border-dark-border p-4 rounded-xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
+        <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-white">
             <Code2 className="w-4 h-4 text-indigo-400" />
             <span>Language:</span>
@@ -143,7 +160,16 @@ const NewReview = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 ml-auto">
+          <button
+            type="button"
+            onClick={() => setCode(DEFAULT_SAMPLE_CODE)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-dark-bg border border-dark-border px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <FileText className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Load Preset Sample</span>
+          </button>
+
           <label className="cursor-pointer inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-dark-bg border border-dark-border px-3 py-1.5 rounded-lg transition-colors">
             <Upload className="w-3.5 h-3.5" />
             <span>Upload File</span>
@@ -155,58 +181,56 @@ const NewReview = () => {
             disabled={loading}
             className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-5 py-2 rounded-lg transition-all shadow-lg shadow-indigo-600/30 disabled:opacity-50"
           >
-            {loading ? (
-              <>
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Running Pipeline...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                <span>Analyze Code</span>
-              </>
-            )}
+            <Sparkles className="w-4 h-4" />
+            <span>{loading ? 'Analyzing Code...' : 'Analyze Code'}</span>
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-xs flex items-center gap-2">
+        <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-lg text-xs flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Monaco Code Editor Workspace */}
-      <div className="bg-dark-surface border border-dark-border rounded-xl overflow-hidden shadow-2xl">
-        <div className="bg-dark-bg/60 border-b border-dark-border px-4 py-2.5 flex items-center justify-between text-xs text-slate-400 font-mono">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-            <span>editor.js — Code Review Workspace</span>
+      {/* Analysis Pipeline Progress Overlay */}
+      {loading ? (
+        <div className="py-8">
+          <AnalysisProgress currentStage={currentStage} />
+        </div>
+      ) : (
+        /* Monaco Code Editor Workspace */
+        <div className="bg-dark-surface border border-dark-border rounded-xl overflow-hidden shadow-2xl">
+          <div className="bg-dark-bg/80 border-b border-dark-border px-4 py-2.5 flex items-center justify-between text-xs text-slate-400 font-mono">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+              <span>editor.js — Source Code Editor Workspace</span>
+            </div>
+            <div>{code.split('\n').length} Lines</div>
           </div>
-          <div>{code.split('\n').length} Lines</div>
-        </div>
 
-        <div className="h-[550px] w-full">
-          <Editor
-            height="100%"
-            language={language}
-            theme="vs-dark"
-            value={code}
-            onChange={(value) => setCode(value || '')}
-            options={{
-              fontSize: 13,
-              fontFamily: 'JetBrains Mono',
-              minimap: { enabled: true },
-              scrollBeyondLastLine: false,
-              automaticLayout: true,
-              tabSize: 2,
-              lineNumbers: 'on',
-              padding: { top: 12, bottom: 12 },
-            }}
-          />
+          <div className="h-[550px] w-full">
+            <Editor
+              height="100%"
+              language={language}
+              theme="vs-dark"
+              value={code}
+              onChange={(value) => setCode(value || '')}
+              options={{
+                fontSize: 13,
+                fontFamily: 'JetBrains Mono',
+                minimap: { enabled: true },
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 2,
+                lineNumbers: 'on',
+                padding: { top: 12, bottom: 12 },
+              }}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

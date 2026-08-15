@@ -1,6 +1,11 @@
 # AI Code Reviewer & Bug Detection Platform
 
+[![Production App](https://img.shields.io/badge/Production-Live-emerald?style=flat-square&logo=vercel)](https://ai-code-reviewer-ips-academyl.vercel.app/)
+[![License](https://img.shields.io/badge/License-MIT-indigo?style=flat-square)](LICENSE)
+
 A production-quality web platform that empowers software developers and engineering teams to analyze source code, detect security vulnerabilities, identify performance bugs, understand root causes, generate automated AI fixes with side-by-side diffs, and review GitHub repositories and Pull Requests with developer approval workflows.
+
+**Production Deployment**: [https://ai-code-reviewer-ips-academyl.vercel.app/](https://ai-code-reviewer-ips-academyl.vercel.app/)
 
 ---
 
