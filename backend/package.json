@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "prisma": "node bin/prisma.js",
     "build": "echo 'Backend build complete'",
     "test": "jest --detectOpenHandles --forceExit"
   },
