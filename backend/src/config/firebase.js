@@ -14,12 +14,28 @@ try {
 let app;
 let db;
 
+function formatPrivateKey(key) {
+  if (!key) return key;
+  let formatted = key.trim();
+
+  // Strip leading and trailing double or single quotes if wrapped in quotes
+  if (
+    (formatted.startsWith('"') && formatted.endsWith('"')) ||
+    (formatted.startsWith("'") && formatted.endsWith("'"))
+  ) {
+    formatted = formatted.slice(1, -1).trim();
+  }
+
+  // Convert literal backslash-n sequences to real newlines
+  formatted = formatted.replace(/\\n/g, '\n');
+
+  return formatted.trim();
+}
+
 const projectId = process.env.FIREBASE_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-if (privateKey) {
-  privateKey = privateKey.replace(/\\n/g, '\n');
-}
+const rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY;
+const privateKey = formatPrivateKey(rawPrivateKey);
 
 const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
 const hasLiveCredentials = Boolean(
@@ -43,6 +59,8 @@ let MockFieldValue = {
   serverTimestamp: () => MockTimestamp.now(),
 };
 
+let isLiveConnected = false;
+
 if (hasLiveCredentials) {
   if (!getApps().length) {
     try {
@@ -53,6 +71,7 @@ if (hasLiveCredentials) {
           projectId: projectId || serviceAccount.project_id,
         });
         logger.info('Firebase Admin SDK initialized using service account JSON path.');
+        isLiveConnected = true;
       } else if (projectId && clientEmail && privateKey) {
         app = initializeApp({
           credential: cert({
@@ -62,27 +81,35 @@ if (hasLiveCredentials) {
           }),
         });
         logger.info(`Firebase Admin SDK initialized successfully for project [${projectId}].`);
+        isLiveConnected = true;
       } else {
         app = initializeApp({
           projectId: projectId || 'demo-ai-code-reviewer',
         });
         logger.info('Firebase Admin SDK initialized for Firestore Emulator.');
+        isLiveConnected = true;
       }
     } catch (error) {
-      logger.error('Failed to initialize Firebase Admin SDK:', error);
+      logger.error('Failed to initialize Firebase Admin SDK with provided credentials:', error.message);
+      logger.warn('Falling back to isolated In-Memory store to prevent server crash.');
     }
   } else {
     app = getApps()[0];
+    isLiveConnected = true;
   }
 
-  db = getFirestore(app);
-
-  try {
-    db.settings({
-      ignoreUndefinedProperties: true,
-    });
-  } catch (e) {
-    // Settings already applied
+  if (isLiveConnected && app) {
+    try {
+      db = getFirestore(app);
+      db.settings({
+        ignoreUndefinedProperties: true,
+      });
+    } catch (e) {
+      // Settings already applied or initialization error
+      if (!db) db = createInMemoryFirestore();
+    }
+  } else {
+    db = createInMemoryFirestore();
   }
 } else {
   logger.info('Using isolated In-Memory Firestore Store for test/development mode (No live GCP credentials provided).');
@@ -250,8 +277,8 @@ const admin = {
   firestore: () => db,
 };
 
-admin.firestore.Timestamp = hasLiveCredentials && RealTimestamp ? RealTimestamp : MockTimestamp;
-admin.firestore.FieldValue = hasLiveCredentials && RealFieldValue ? RealFieldValue : MockFieldValue;
+admin.firestore.Timestamp = isLiveConnected && RealTimestamp ? RealTimestamp : MockTimestamp;
+admin.firestore.FieldValue = isLiveConnected && RealFieldValue ? RealFieldValue : MockFieldValue;
 
 module.exports = {
   admin,
