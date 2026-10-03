@@ -1,21 +1,22 @@
-const { PrismaClient } = require('@prisma/client');
+const { db, admin } = require('./firebase');
 const logger = require('./logger');
-
-const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
-});
 
 async function connectDatabase() {
   try {
-    await prisma.$connect();
-    logger.info('Successfully connected to PostgreSQL database via Prisma.');
+    // Perform a lightweight Firestore operation to verify connectivity
+    await db.collection('healthcheck').limit(1).get();
+    logger.info('Successfully verified connectivity to Firebase Firestore.');
   } catch (error) {
-    logger.error('Failed to connect to PostgreSQL database:', error);
-    throw error;
+    logger.error('Failed to connect to Firebase Firestore:', error);
+    // Don't throw fatal crash during dev if offline mock mode is active, but log error
+    if (process.env.NODE_ENV === 'production') {
+      throw error;
+    }
   }
 }
 
 module.exports = {
-  prisma,
+  db,
+  admin,
   connectDatabase,
 };

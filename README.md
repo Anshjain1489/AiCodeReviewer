@@ -16,10 +16,10 @@ Browser (React + Vite + Tailwind CSS + Monaco Editor)
    │
    │ HTTPS REST API (/api/v1)
    ▼
-Node.js / Express Backend (Modular Monolith)
+Node.js / Express Backend (Render)
    │
    ├─► Security & Auth (JWT, bcrypt, Helmet, CORS Allowlist, Rate Limiting)
-   ├─► Prisma ORM ──► PostgreSQL (Supabase / Local Docker)
+   ├─► Database Layer (Firebase Admin SDK ──► Firebase Cloud Firestore)
    ├─► Static Analysis Engine (ESLint + Semgrep + Rule Engine)
    ├─► AI Engine Abstraction (Google Gemini 1.5 Pro/Flash + OpenAI + Mock Dev Provider)
    ├─► Scoring Engine (Security 25%, Bugs 25%, Maintainability 20%, Performance 15%, Quality 15%)
@@ -31,11 +31,11 @@ Node.js / Express Backend (Modular Monolith)
 ## Tech Stack
 
 - **Frontend**: React.js, Vite, Tailwind CSS (Dark-first IDE theme), React Router v6, Axios, `@monaco-editor/react`, `recharts`, `lucide-react`.
-- **Backend**: Node.js, Express.js, Prisma ORM, Winston logger, Helmet, CORS, `express-rate-limit`, `bcryptjs`, `jsonwebtoken`.
-- **Database**: PostgreSQL (Supabase PostgreSQL / Docker PostgreSQL).
+- **Backend**: Node.js, Express.js, Firebase Admin SDK (`firebase-admin`), Winston logger, Helmet, CORS, `express-rate-limit`, `bcryptjs`, `jsonwebtoken`.
+- **Database**: Firebase Cloud Firestore (`users`, `projects`, `projectFiles`, `reviews`, `reviewIssues`, `issueFixes`, `aiConversations`, `aiMessages`, `githubConnections`, `githubRepositories`, `pullRequests`, `usageRecords`, `auditLogs`).
 - **Static Analysis**: ESLint programmatic API, Semgrep CLI adapter, Rule Engine.
 - **AI Abstraction**: Google Gemini (`@google/generative-ai`), OpenAI (`openai`), Development Mock Provider (`mock`).
-- **DevOps**: Docker, Docker Compose, GitHub Actions CI/CD.
+- **DevOps**: Docker, GitHub Actions CI/CD.
 
 ---
 
@@ -58,24 +58,16 @@ Node.js / Express Backend (Modular Monolith)
 
 ### Prerequisites
 - Node.js >= 18.0.0
-- Docker & Docker Compose (Optional for local DB/Redis)
 
-### 1. Database Setup
-Ensure PostgreSQL is running locally or via Docker:
-```bash
-docker-compose up -d postgres redis
-```
-
-### 2. Backend Setup
+### 1. Backend Setup
 ```bash
 cd backend
 npm install
 cp .env.example .env
-npx prisma generate
 npm run dev
 ```
 
-### 3. Frontend Setup
+### 2. Frontend Setup
 ```bash
 cd frontend
 npm install
@@ -84,6 +76,19 @@ npm run dev
 ```
 
 The frontend will run at `http://localhost:3000` and connect to the backend at `http://localhost:5000/api/v1`.
+
+---
+
+## Data Migration Tool (PostgreSQL -> Firestore)
+
+To migrate historical PostgreSQL records to Firebase Firestore:
+```bash
+# Dry-run mode
+node backend/scripts/migratePostgresToFirestore.js --dry-run
+
+# Live migration
+node backend/scripts/migratePostgresToFirestore.js
+```
 
 ---
 
@@ -110,8 +115,9 @@ npm test
 NODE_ENV=development
 PORT=5000
 
-DATABASE_URL="postgresql://postgres:postgrespassword@localhost:5432/aicode_reviewer?schema=public"
-DIRECT_URL="postgresql://postgres:postgrespassword@localhost:5432/aicode_reviewer?schema=public"
+FIREBASE_PROJECT_ID=ai-code-reviewer-e0b62
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@ai-code-reviewer-e0b62.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 
 JWT_SECRET=super_secret_jwt_key_for_ai_code_reviewer_dev_mode_32chars
 JWT_EXPIRES_IN=7d
@@ -125,7 +131,7 @@ GITHUB_CLIENT_SECRET=your_github_client_secret
 GITHUB_CALLBACK_URL=http://localhost:5000/api/v1/github/callback
 
 # AI Provider options: gemini | openai | mock
-AI_PROVIDER=mock
+AI_PROVIDER=gemini
 GEMINI_API_KEY=your_gemini_api_key
 OPENAI_API_KEY=your_openai_api_key
 
@@ -140,18 +146,8 @@ VITE_API_URL=http://localhost:5000/api/v1
 
 ---
 
-## Untrusted Code Isolation Strategy
-
-To prevent security risks when analyzing untrusted code uploads or repository archives:
-1. **Isolated Workspaces**: Extracted archives run in temporary directories (`temp_workspaces/`) outside process execution paths.
-2. **Resource Limits**: File count cap (500 files), extracted size cap (50MB), path traversal rejection (`..` path detection).
-3. **No Dynamic Execution**: Code is parsed strictly via static AST and LLM prompt tokens; source code is never dynamically required (`eval`/`require`) inside the API process.
-4. **Workspace Cleanup**: Temporary directories are force-purged immediately upon review completion.
-
----
-
 ## Production Deployment
 
 - **Frontend**: Deploy to **Vercel** (`npm run build`). Set `VITE_API_URL`.
-- **Backend**: Deploy to **Render** (`node src/server.js`). Set `process.env.PORT` dynamically and configure CORS allowlist.
-- **Database**: Host PostgreSQL on **Supabase**. Apply migrations with `npx prisma migrate deploy`.
+- **Backend**: Deploy to **Render** (`node src/server.js`). Configure environment variables (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `JWT_SECRET`, etc.).
+- **Database**: **Firebase Cloud Firestore**. Managed automatically via Firebase Admin SDK.

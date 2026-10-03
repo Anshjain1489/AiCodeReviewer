@@ -1,57 +1,29 @@
 # Architecture — AI Code Reviewer & Bug Detection Platform
 
 ## 1. Architecture Style
-Use a modular monolith for the first production version.
+Use a modular monolith for the application backend with clean separation of concerns:
 
 Frontend and backend are separate applications:
-- React frontend
-- Node.js/Express backend
+- React frontend (Vercel)
+- Node.js/Express backend (Render)
 
-The backend should be organized by feature/domain rather than a large flat controller structure.
+The database layer uses Firebase Cloud Firestore accessed via the Firebase Admin SDK (`firebase-admin`).
 
 ## 2. High-Level Architecture
 
 ```text
-Browser
-   |
-   v
-React + Vite
-   |
-   | HTTPS REST API
-   v
-Node.js + Express
-   |
-   +--------------------+
-   |                    |
-   v                    v
-PostgreSQL            Redis
-Supabase              cache/rate limits/jobs
-   |
-   v
-Prisma ORM
-
-Review Service
-   |
-   +--> Static Analysis Adapter
-   |      +--> ESLint
-   |      +--> Semgrep
-   |
-   +--> AI Service
-   |      +--> Gemini
-   |      +--> OpenAI
-   |
-   +--> Issue Normalizer
-   |
-   +--> Score Calculator
-   |
-   +--> Fix Generator
-
-GitHub Service
-   |
-   +--> GitHub OAuth
-   +--> Repositories
-   +--> Branches
-   +--> Pull Requests
+Browser (React + Vite + Tailwind CSS + Monaco Editor)
+   │
+   │ HTTPS REST API (/api/v1)
+   ▼
+Node.js / Express Backend (Render)
+   │
+   ├─► Security & Auth (JWT, bcrypt, Helmet, CORS Allowlist, Rate Limiting)
+   ├─► Database Access Layer (Firebase Admin SDK ──► Firebase Cloud Firestore)
+   ├─► Static Analysis Engine (ESLint + Semgrep + Rule Engine)
+   ├─► AI Engine Abstraction (Google Gemini 1.5 Pro/Flash + OpenAI + Mock Dev Provider)
+   ├─► Scoring Engine (Security 25%, Bugs 25%, Maintainability 20%, Performance 15%, Quality 15%)
+   └─► GitHub Integration (OAuth, Repositories, Branches, PRs, Developer Approval Workflow)
 ```
 
 ## 3. Frontend Architecture
@@ -72,191 +44,67 @@ src/
 
 Use:
 - React Router for routing
-- Axios for HTTP
+- Axios for HTTP REST calls
 - Context API for authentication/global lightweight state
 - Local component state for page-specific state
-- Avoid unnecessary global state libraries in MVP
 
 ## 4. Backend Architecture
 
 ```text
 src/
-├── config/
-├── controllers/
-├── services/
-├── repositories/
-├── routes/
-├── middleware/
-├── validators/
-├── analyzers/
-├── integrations/
-├── utils/
+├── config/             # Environment, Logger, Firebase Admin SDK configuration
+├── controllers/        # Express HTTP request handlers
+├── services/           # Business & domain logic (Review pipeline, AI, GitHub, Dashboard)
+├── repositories/       # Firestore collection data access repositories
+├── routes/             # REST route definitions
+├── middleware/         # Auth JWT verification, Audit logger, Error handler, Rate limiter
+├── validators/         # Request validation logic
+├── analyzers/          # ESLint & Semgrep static code analysis engines
+├── integrations/       # AI Providers (Gemini, OpenAI, Mock) & GitHub API Client
+├── utils/              # Token encryption, Response formatters, Workspace cleaners
 └── app.js
 ```
 
-### Responsibilities
-Controllers:
-- Receive HTTP requests
-- Validate request shape
-- Call services
-- Return HTTP responses
-
-Services:
-- Business logic
-- Review orchestration
-- AI orchestration
-- GitHub workflows
-
-Repositories:
-- Database access through Prisma
-
-Analyzers:
-- Adapters around ESLint/Semgrep/custom rules
-
-Integrations:
-- GitHub
-- AI providers
+### Repositories Responsibility
+Repositories handle all database access through Firebase Admin SDK (`db.collection(...)`):
+- `userRepository.js` -> `users` collection
+- `projectRepository.js` -> `projects` collection
+- `reviewRepository.js` -> `reviews` collection
+- `issueRepository.js` -> `reviewIssues` & `issueFixes` collections
+- `githubRepository.js` -> `githubConnections`, `githubRepositories`, `pullRequests` collections
 
 ## 5. Review Pipeline
 
 ```text
 Submit Code
-    |
-    v
-Create Review
-    |
-    v
-Store Source/Metadata
-    |
-    v
-Static Analysis
-    |
-    v
-Normalize Findings
-    |
-    v
-AI Analysis
-    |
-    v
-Deduplicate/Rank Findings
-    |
-    v
-Calculate Score
-    |
-    v
-Persist Result
-    |
-    v
-Return Review
+    │
+    ▼
+Create Review (Firestore `reviews` document)
+    │
+    ▼
+Static Analysis (ESLint + Semgrep)
+    │
+    ▼
+AI Context Analysis (Gemini / OpenAI)
+    │
+    ▼
+Deduplicate & Rank Findings
+    │
+    ▼
+Calculate Score (Deterministic Engine)
+    │
+    ▼
+Persist Findings & Scores (Firestore `reviewIssues`)
+    │
+    ▼
+Return Response
 ```
 
-## 6. AI Provider Abstraction
-
-Create an interface-like service:
-
-```text
-AIProvider
-├── analyzeCode()
-├── explainIssue()
-├── generateFix()
-└── chatAboutReview()
-```
-
-Implement provider adapters:
-- GeminiProvider
-- OpenAIProvider
-
-The rest of the application must not depend directly on provider-specific SDK calls.
-
-## 7. Analyzer Abstraction
-
-```text
-Analyzer
-├── analyze()
-├── getName()
-└── getSupportedLanguages()
-```
-
-Implement:
-- ESLintAnalyzer
-- SemgrepAnalyzer
-- Future analyzers
-
-## 8. Security Architecture
+## 6. Security Architecture
 - HTTPS in production
-- JWT access tokens
-- Secure password hashing
-- OAuth token encryption at rest
-- Request validation
-- Rate limiting
-- CORS allowlist
-- Helmet security headers
-- File type and size validation
-- Temporary source files must be isolated
-- Never execute arbitrary user code in the API process
-- Sanitize rendered code/AI output
-- Do not expose secrets to frontend
-
-## 9. Untrusted Code Isolation
-Static analysis of uploaded projects must happen outside the main API process.
-
-Preferred approach:
-```text
-API
- |
- v
-Analysis Job
- |
- v
-Isolated Worker/Container
- |
- +--> ESLint
- +--> Semgrep
- |
- v
-Normalized Results
- |
- v
-API/Database
-```
-
-For MVP, analysis may be implemented as a controlled worker process, but production should use container isolation.
-
-## 10. Scalability
-Start with a modular monolith. Extract services only when necessary:
-- Analysis workers
-- AI worker
-- GitHub worker
-
-Redis can support:
-- Rate limiting
-- Job queues
-- Caching
-- Temporary state
-
-## 11. Error Handling
-Use a standard error shape:
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "REVIEW_NOT_FOUND",
-    "message": "Review was not found"
-  }
-}
-```
-
-Never return stack traces or secrets to clients.
-
-## 12. Observability
-Track:
-- API errors
-- Review duration
-- AI latency
-- Analyzer failures
-- GitHub API failures
-- Queue failures
-- Authentication failures
-
-Use structured logs with request IDs.
+- JWT access tokens (backend application auth)
+- Bcrypt password hashing
+- GitHub OAuth access token AES-256 encryption at rest
+- Rate limiting & Helmet security headers
+- Firebase Admin SDK private key protected on backend (never exposed to frontend)
+- Firestore direct client access disabled (`firestore.rules`)

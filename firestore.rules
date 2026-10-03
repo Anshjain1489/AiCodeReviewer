@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // SECURITY ARCHITECTURE NOTE:
+    // Application requests are processed exclusively through Node.js + Express backend
+    // using the Firebase Admin SDK, which bypasses client-side Security Rules.
+    // Direct client access from frontend browsers is disabled for safety.
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

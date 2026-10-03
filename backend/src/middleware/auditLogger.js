@@ -1,20 +1,20 @@
-const { prisma } = require('../config/database');
+const { db, admin } = require('../config/database');
 const logger = require('../config/logger');
 
 async function logAuditAction({ userId = null, action, resourceType, resourceId = null, ipHash = null, metadata = {} }) {
   try {
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action,
-        resourceType,
-        resourceId,
-        ipHash,
-        metadata,
-      },
+    const now = admin.firestore.Timestamp.now();
+    await db.collection('auditLogs').add({
+      userId,
+      action,
+      resourceType,
+      resourceId,
+      ipHash,
+      metadata,
+      createdAt: now,
     });
   } catch (err) {
-    logger.error('Failed to create audit log entry:', err);
+    logger.error('Failed to create audit log entry in Firestore:', err);
   }
 }
 

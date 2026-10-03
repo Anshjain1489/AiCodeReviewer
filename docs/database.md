@@ -1,243 +1,199 @@
 # Database Design — AI Code Reviewer & Bug Detection Platform
 
-## 1. Database
-Use PostgreSQL hosted on Supabase.
+## 1. Database Architecture
+Database: **Firebase Cloud Firestore**  
+Access Layer: **Node.js Express + Firebase Admin SDK (`firebase-admin`)**
 
-ORM:
-- Prisma
+Application-level authentication (JWT + bcrypt) remains enforced in the Express backend middleware. The Firebase Admin SDK accesses Firestore directly with service credentials without requiring Firebase Authentication.
 
-## 2. Core Entities
+---
+
+## 2. Core Collections
 
 ```text
-User
- ├── Project
- │    ├── ProjectFile
- │    └── Review
- │         ├── ReviewIssue
- │         │    └── IssueFix
- │         └── AIConversation
+users
+ ├── projects
+ │    ├── projectFiles
+ │    └── reviews
+ │         ├── reviewIssues
+ │         │    └── issueFixes
+ │         └── aiConversations
+ │              └── aiMessages
  │
- └── GitHubConnection
-      └── PullRequest
+ └── githubConnections
+      └── githubRepositories
+           └── pullRequests
 ```
 
-## 3. Tables
+---
 
-### users
-- id UUID PK
-- name
-- email UNIQUE
-- password_hash nullable
-- avatar_url nullable
-- provider nullable
-- role
-- is_active
-- created_at
-- updated_at
+## 3. Collections & Document Schema
 
-### projects
-- id UUID PK
-- user_id FK
-- name
-- description nullable
-- language nullable
-- repository_url nullable
-- created_at
-- updated_at
+### `users`
+- `id`: string (UUID, Document ID)
+- `name`: string
+- `email`: string (normalized lowercase, unique)
+- `passwordHash`: string (bcrypt hash, nullable for OAuth)
+- `avatarUrl`: string (nullable)
+- `provider`: string ("email" | "google")
+- `role`: string ("USER" | "ADMIN")
+- `isActive`: boolean
+- `createdAt`: Firestore Timestamp
+- `updatedAt`: Firestore Timestamp
 
-### project_files
-- id UUID PK
-- project_id FK
-- path
-- language
-- size_bytes
-- content_hash
-- created_at
+### `projects`
+- `id`: string (UUID, Document ID)
+- `userId`: string (FK to `users`)
+- `name`: string
+- `description`: string (nullable)
+- `language`: string
+- `repositoryUrl`: string (nullable)
+- `createdAt`: Firestore Timestamp
+- `updatedAt`: Firestore Timestamp
 
-Do not permanently store raw source code unless explicitly required by product settings.
+### `projectFiles`
+- `id`: string (UUID, Document ID)
+- `projectId`: string (FK to `projects`)
+- `path`: string
+- `language`: string
+- `sizeBytes`: number
+- `contentHash`: string
+- `createdAt`: Firestore Timestamp
 
-### reviews
-- id UUID PK
-- project_id FK
-- user_id FK
-- source_type
-- commit_sha nullable
-- branch_name nullable
-- status
-- overall_score nullable
-- security_score nullable
-- bug_score nullable
-- performance_score nullable
-- maintainability_score nullable
-- quality_score nullable
-- total_issues
-- started_at
-- completed_at
-- created_at
+### `reviews`
+- `id`: string (UUID, Document ID)
+- `projectId`: string (FK to `projects`, nullable)
+- `userId`: string (FK to `users`)
+- `sourceType`: string ("MANUAL" | "ZIP_UPLOAD" | "GITHUB_REPO" | "GITHUB_PR")
+- `commitSha`: string (nullable)
+- `branchName`: string (nullable)
+- `status`: string ("QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED")
+- `overallScore`: number (nullable)
+- `securityScore`: number (nullable)
+- `bugScore`: number (nullable)
+- `performanceScore`: number (nullable)
+- `maintainabilityScore`: number (nullable)
+- `qualityScore`: number (nullable)
+- `totalIssues`: number
+- `code`: string (Text)
+- `language`: string
+- `startedAt`: Firestore Timestamp (nullable)
+- `completedAt`: Firestore Timestamp (nullable)
+- `createdAt`: Firestore Timestamp
 
-### review_issues
-- id UUID PK
-- review_id FK
-- file_path
-- line_start nullable
-- line_end nullable
-- column_start nullable
-- column_end nullable
-- category
-- severity
-- title
-- description
-- impact nullable
-- recommendation nullable
-- rule_id nullable
-- source
-- fingerprint
-- status
-- created_at
+### `reviewIssues`
+- `id`: string (UUID, Document ID)
+- `reviewId`: string (FK to `reviews`)
+- `filePath`: string
+- `lineStart`: number (nullable)
+- `lineEnd`: number (nullable)
+- `columnStart`: number (nullable)
+- `columnEnd`: number (nullable)
+- `category`: string ("BUG" | "SECURITY" | "PERFORMANCE" | "QUALITY" | "MAINTAINABILITY" | "COMPLEXITY" | "BEST_PRACTICE")
+- `severity`: string ("CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO")
+- `title`: string
+- `description`: string
+- `impact`: string (nullable)
+- `recommendation`: string (nullable)
+- `ruleId`: string (nullable)
+- `source`: string
+- `fingerprint`: string
+- `status`: string ("OPEN" | "FIXED" | "IGNORED" | "ACCEPTED")
+- `createdAt`: Firestore Timestamp
 
-### issue_fixes
-- id UUID PK
-- issue_id FK
-- original_code
-- suggested_code
-- explanation
-- status
-- created_at
+### `issueFixes`
+- `id`: string (UUID, Document ID)
+- `issueId`: string (FK to `reviewIssues`)
+- `originalCode`: string
+- `suggestedCode`: string
+- `explanation`: string
+- `status`: string ("OPEN" | "ACCEPTED" | "REJECTED")
+- `createdAt`: Firestore Timestamp
 
-### ai_conversations
-- id UUID PK
-- user_id FK
-- review_id FK
-- title nullable
-- created_at
-- updated_at
+### `aiConversations`
+- `id`: string (UUID, Document ID)
+- `userId`: string (FK to `users`)
+- `reviewId`: string (FK to `reviews`)
+- `title`: string (nullable)
+- `createdAt`: Firestore Timestamp
+- `updatedAt`: Firestore Timestamp
 
-### ai_messages
-- id UUID PK
-- conversation_id FK
-- role
-- content
-- token_usage nullable
-- created_at
+### `aiMessages`
+- `id`: string (UUID, Document ID)
+- `conversationId`: string (FK to `aiConversations`)
+- `role`: string ("user" | "assistant" | "system")
+- `content`: string
+- `tokenUsage`: number (nullable)
+- `createdAt`: Firestore Timestamp
 
-### github_connections
-- id UUID PK
-- user_id FK
-- github_user_id
-- username
-- encrypted_access_token
-- scopes
-- created_at
-- updated_at
+### `githubConnections`
+- `id`: string (UUID, Document ID)
+- `userId`: string (FK to `users`)
+- `githubUserId`: string
+- `username`: string
+- `encryptedAccessToken`: string (AES-256 encrypted)
+- `scopes`: string (nullable)
+- `createdAt`: Firestore Timestamp
+- `updatedAt`: Firestore Timestamp
 
-### github_repositories
-- id UUID PK
-- connection_id FK
-- github_repo_id
-- owner
-- name
-- full_name
-- default_branch
-- private
-- html_url
-- created_at
-- updated_at
+### `githubRepositories`
+- `id`: string (UUID, Document ID)
+- `connectionId`: string (FK to `githubConnections`)
+- `githubRepoId`: string
+- `owner`: string
+- `name`: string
+- `fullName`: string
+- `defaultBranch`: string
+- `private`: boolean
+- `htmlUrl`: string
+- `createdAt`: Firestore Timestamp
+- `updatedAt`: Firestore Timestamp
 
-### pull_requests
-- id UUID PK
-- repository_id FK
-- github_pr_id
-- number
-- title
-- branch_name
-- base_branch
-- commit_sha
-- status
-- review_id nullable
-- created_at
-- updated_at
+### `pullRequests`
+- `id`: string (UUID, Document ID)
+- `repositoryId`: string (FK to `githubRepositories`)
+- `githubPrId`: string
+- `number`: number
+- `title`: string
+- `branchName`: string
+- `baseBranch`: string
+- `commitSha`: string
+- `status`: string
+- `reviewId`: string (FK to `reviews`, nullable)
+- `createdAt`: Firestore Timestamp
+- `updatedAt`: Firestore Timestamp
 
-### usage_records
-- id UUID PK
-- user_id FK
-- action
-- units
-- metadata JSONB
-- created_at
+### `usageRecords`
+- `id`: string (UUID, Document ID)
+- `userId`: string (FK to `users`)
+- `action`: string
+- `units`: number
+- `metadata`: map (nullable)
+- `createdAt`: Firestore Timestamp
 
-### audit_logs
-- id UUID PK
-- user_id nullable
-- action
-- resource_type
-- resource_id nullable
-- ip_hash nullable
-- metadata JSONB
-- created_at
+### `auditLogs`
+- `id`: string (UUID, Document ID)
+- `userId`: string (FK to `users`, nullable)
+- `action`: string
+- `resourceType`: string
+- `resourceId`: string (nullable)
+- `ipHash`: string (nullable)
+- `metadata`: map (nullable)
+- `createdAt`: Firestore Timestamp
 
-## 4. Enums
+---
 
-### review_status
-- QUEUED
-- RUNNING
-- COMPLETED
-- FAILED
-- CANCELLED
+## 4. Firestore Composite Indexes (`firestore.indexes.json`)
+- `reviews`: `userId` (ASC) + `createdAt` (DESC)
+- `reviews`: `projectId` (ASC) + `createdAt` (DESC)
+- `reviewIssues`: `reviewId` (ASC) + `severity` (ASC) + `lineStart` (ASC)
+- `usageRecords`: `userId` (ASC) + `createdAt` (DESC)
+- `auditLogs`: `userId` (ASC) + `createdAt` (DESC)
+- `githubRepositories`: `connectionId` (ASC) + `fullName` (ASC)
 
-### issue_severity
-- CRITICAL
-- HIGH
-- MEDIUM
-- LOW
-- INFO
+---
 
-### issue_category
-- BUG
-- SECURITY
-- PERFORMANCE
-- QUALITY
-- MAINTAINABILITY
-- COMPLEXITY
-- BEST_PRACTICE
-
-### issue_status
-- OPEN
-- FIXED
-- IGNORED
-- ACCEPTED
-
-## 5. Relationships
-- User 1:N Project
-- Project 1:N ProjectFile
-- Project 1:N Review
-- Review 1:N ReviewIssue
-- ReviewIssue 1:N IssueFix
-- Review 1:N AIConversation
-- AIConversation 1:N AIMessage
-- User 1:N GitHubConnection
-- GitHubConnection 1:N GitHubRepository
-- GitHubRepository 1:N PullRequest
-
-## 6. Indexes
-Create indexes for:
-- users.email
-- projects.user_id
-- reviews.project_id
-- reviews.user_id
-- reviews.status
-- review_issues.review_id
-- review_issues.severity
-- review_issues.category
-- review_issues.fingerprint
-- pull_requests.repository_id
-- usage_records.user_id
-- audit_logs.user_id
-- created_at fields used for dashboard queries
-
-## 7. Data Privacy
-- Never log passwords.
-- Never log OAuth access tokens.
-- Encrypt GitHub tokens.
-- Minimize source-code persistence.
-- Allow users to delete projects/reviews.
-- Remove temporary analysis artifacts after completion.
+## 5. Security & Privacy Model
+- **Firebase Admin SDK Bypass**: All requests pass through Express authorization middleware. Direct client SDK connection to Firestore is disabled (`firestore.rules`).
+- **Token Protection**: GitHub access tokens are encrypted using AES-256 before writing to Firestore and never returned in API responses.
+- **Passwords**: Stored exclusively as bcrypt salted hashes.

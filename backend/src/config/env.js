@@ -6,25 +6,20 @@ function validateEnv() {
 
   const missing = [];
 
-  if (!process.env.DATABASE_URL) missing.push('DATABASE_URL');
   if (!process.env.JWT_SECRET) missing.push('JWT_SECRET');
 
   if (isProd) {
     if (!process.env.FRONTEND_URL) missing.push('FRONTEND_URL');
+    if (!process.env.FIREBASE_PROJECT_ID) missing.push('FIREBASE_PROJECT_ID');
+    if (!process.env.FIREBASE_CLIENT_EMAIL) missing.push('FIREBASE_CLIENT_EMAIL');
+    if (!process.env.FIREBASE_PRIVATE_KEY) missing.push('FIREBASE_PRIVATE_KEY');
     if (provider === 'gemini' && !process.env.GEMINI_API_KEY) missing.push('GEMINI_API_KEY');
     if (provider === 'openai' && !process.env.OPENAI_API_KEY) missing.push('OPENAI_API_KEY');
   }
 
   if (missing.length > 0) {
-    // Sanitized Error: Never print secret values or connection strings
     throw new Error(
       `FATAL ENVIRONMENT ERROR: Missing required environment variable(s): ${missing.join(', ')}. Please configure them in your backend .env file.`
-    );
-  }
-
-  if (process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('postgres')) {
-    throw new Error(
-      'FATAL ENVIRONMENT ERROR: DATABASE_URL must be a valid PostgreSQL connection string starting with postgresql:// or postgres://'
     );
   }
 }
@@ -34,8 +29,9 @@ module.exports = {
   env: {
     NODE_ENV: process.env.NODE_ENV || 'development',
     PORT: parseInt(process.env.PORT || '5000', 10),
-    DATABASE_URL: process.env.DATABASE_URL,
-    DIRECT_URL: process.env.DIRECT_URL || process.env.DATABASE_URL,
+    FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
+    FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL,
+    FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY,
     JWT_SECRET: process.env.JWT_SECRET,
     JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
