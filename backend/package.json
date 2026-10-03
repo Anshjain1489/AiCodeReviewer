@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Backend REST API for AI Code Reviewer & Bug Detection Platform",
   "main": "src/server.js",
+  "bin": {
+    "prisma": "./bin/prisma.js"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
