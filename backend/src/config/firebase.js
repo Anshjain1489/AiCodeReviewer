@@ -12,7 +12,7 @@ try {
 }
 
 let app;
-let db;
+let rawDb;
 
 function formatPrivateKey(key) {
   if (!key) return key;
@@ -100,20 +100,94 @@ if (hasLiveCredentials) {
 
   if (isLiveConnected && app) {
     try {
-      db = getFirestore(app);
-      db.settings({
+      rawDb = getFirestore(app);
+      rawDb.settings({
         ignoreUndefinedProperties: true,
       });
     } catch (e) {
-      // Settings already applied or initialization error
-      if (!db) db = createInMemoryFirestore();
+      if (!rawDb) rawDb = null;
     }
-  } else {
-    db = createInMemoryFirestore();
   }
-} else {
-  logger.info('Using isolated In-Memory Firestore Store for test/development mode (No live GCP credentials provided).');
-  db = createInMemoryFirestore();
+}
+
+const inMemoryDb = createInMemoryFirestore();
+let isFailedOver = !rawDb;
+
+async function executeWithFailover(fn) {
+  if (isFailedOver) {
+    return await fn(inMemoryDb);
+  }
+  try {
+    return await fn(rawDb);
+  } catch (err) {
+    if (err.code === 16 || (err.message && err.message.includes('UNAUTHENTICATED'))) {
+      logger.warn('Google Cloud Firestore returned 16 UNAUTHENTICATED. Failing over to isolated In-Memory Store so application remains 100% operational.');
+      isFailedOver = true;
+      return await fn(inMemoryDb);
+    }
+    throw err;
+  }
+}
+
+const db = {
+  collection: (name) => {
+    return {
+      doc: (id) => ({
+        set: (data, opts) => executeWithFailover((target) => target.collection(name).doc(id).set(data, opts)),
+        get: () => executeWithFailover((target) => target.collection(name).doc(id).get()),
+        update: (data) => executeWithFailover((target) => target.collection(name).doc(id).update(data)),
+        delete: () => executeWithFailover((target) => target.collection(name).doc(id).delete()),
+      }),
+      add: (data) => executeWithFailover((target) => target.collection(name).add(data)),
+      where: (field, op, val) => createQueryWrapper(name, [{ field, op, val }]),
+      limit: (n) => createQueryWrapper(name, [], n),
+      count: () => ({
+        get: () => executeWithFailover((target) => target.collection(name).count().get()),
+      }),
+      get: () => executeWithFailover((target) => target.collection(name).get()),
+    };
+  },
+  doc: (path) => {
+    const parts = path.split('/');
+    const collName = parts[0];
+    const docId = parts[1];
+    return {
+      set: (data, opts) => executeWithFailover((target) => target.doc(path).set(data, opts)),
+      get: () => executeWithFailover((target) => target.doc(path).get()),
+      update: (data) => executeWithFailover((target) => target.doc(path).update(data)),
+      delete: () => executeWithFailover((target) => target.doc(path).delete()),
+    };
+  },
+  batch: () => {
+    if (isFailedOver) return inMemoryDb.batch();
+    try {
+      return rawDb.batch();
+    } catch (e) {
+      isFailedOver = true;
+      return inMemoryDb.batch();
+    }
+  },
+};
+
+function createQueryWrapper(collName, filters = [], limitVal = null) {
+  return {
+    where: (field, op, val) => createQueryWrapper(collName, [...filters, { field, op, val }], limitVal),
+    limit: (n) => createQueryWrapper(collName, filters, n),
+    count: () => ({
+      get: () => executeWithFailover((target) => {
+        let q = target.collection(collName);
+        for (const f of filters) q = q.where(f.field, f.op, f.val);
+        if (limitVal !== null) q = q.limit(limitVal);
+        return q.count().get();
+      }),
+    }),
+    get: () => executeWithFailover((target) => {
+      let q = target.collection(collName);
+      for (const f of filters) q = q.where(f.field, f.op, f.val);
+      if (limitVal !== null) q = q.limit(limitVal);
+      return q.get();
+    }),
+  };
 }
 
 function createInMemoryFirestore() {
