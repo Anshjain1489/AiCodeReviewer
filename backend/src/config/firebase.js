@@ -1,6 +1,15 @@
 const { initializeApp, getApps, cert } = require('firebase-admin/app');
-const { getFirestore, Timestamp: RealTimestamp, FieldValue: RealFieldValue } = require('firebase-admin/firestore');
 const logger = require('./logger');
+
+let getFirestore, RealTimestamp, RealFieldValue;
+try {
+  const firestoreModule = require('firebase-admin/firestore');
+  getFirestore = firestoreModule.getFirestore;
+  RealTimestamp = firestoreModule.Timestamp;
+  RealFieldValue = firestoreModule.FieldValue;
+} catch (e) {
+  logger.warn('firebase-admin/firestore module dynamic load fallback:', e.message);
+}
 
 let app;
 let db;
@@ -13,7 +22,9 @@ if (privateKey) {
 }
 
 const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
-const hasLiveCredentials = Boolean(serviceAccountPath || (projectId && clientEmail && privateKey) || process.env.FIRESTORE_EMULATOR_HOST);
+const hasLiveCredentials = Boolean(
+  (serviceAccountPath || (projectId && clientEmail && privateKey) || process.env.FIRESTORE_EMULATOR_HOST) && getFirestore
+);
 
 let MockTimestamp = {
   now: () => ({
@@ -239,8 +250,8 @@ const admin = {
   firestore: () => db,
 };
 
-admin.firestore.Timestamp = hasLiveCredentials ? RealTimestamp : MockTimestamp;
-admin.firestore.FieldValue = hasLiveCredentials ? RealFieldValue : MockFieldValue;
+admin.firestore.Timestamp = hasLiveCredentials && RealTimestamp ? RealTimestamp : MockTimestamp;
+admin.firestore.FieldValue = hasLiveCredentials && RealFieldValue ? RealFieldValue : MockFieldValue;
 
 module.exports = {
   admin,
